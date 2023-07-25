@@ -8,13 +8,15 @@ import boxen from 'boxen'
 import fs from 'fs-extra'
 import pLimit from 'p-limit'
 import { version } from '../package.json'
+import type { PreprocessOptions } from './scan'
 import { verifyScan } from './scan'
 
 export interface CliOptions {
   dirSource: string
   dirValid: string
   dirInvalid: string
-  mode: 'move' | 'copy'
+  mode: 'move' | 'copy' | 'none'
+  tolerance: 'none' | 'high' | 'medium'
 }
 
 async function run() {
@@ -23,7 +25,22 @@ async function run() {
     dirValid: join(process.cwd(), 'scannable'),
     dirInvalid: join(process.cwd(), 'non-scannable'),
     mode: 'move',
+    tolerance: 'high',
   }
+
+  const files = await fg('*.{png,jpg,jpeg,webp}', {
+    cwd: options.dirSource,
+    onlyFiles: true,
+    dot: false,
+    absolute: true,
+  })
+
+  if (!files.length) {
+    console.log(c.yellow('\nNo images found in this directory'))
+    process.exit(0)
+  }
+
+  console.log(c.blue(`\n· ${files.length} images founded\n`))
 
   Object.assign(options, await prompts([
     {
@@ -38,6 +55,29 @@ async function run() {
         {
           value: 'move',
           title: 'Copy images',
+        },
+        {
+          value: 'none',
+          title: 'Scan only',
+        },
+      ],
+    },
+    {
+      type: 'select',
+      name: 'tolerance',
+      message: 'Select scanner tolerance (chance to get scanned)',
+      choices: [
+        {
+          value: 'high',
+          title: 'High tolerance (try 25 times)',
+        },
+        {
+          value: 'medium',
+          title: 'Medium tolerance (try 9 times)',
+        },
+        {
+          value: 'none',
+          title: 'No preprocessing',
         },
       ],
     },
@@ -69,14 +109,7 @@ async function run() {
   if (!confirm)
     process.exit(1)
 
-  const files = await fg('*.{png,jpg,jpeg,webp}', {
-    cwd: options.dirSource,
-    onlyFiles: true,
-    dot: false,
-    absolute: true,
-  })
-
-  console.log(c.blue(`\n - ${files.length} files founded\n`))
+  console.log()
 
   const limit = pLimit(5)
 
@@ -85,39 +118,73 @@ async function run() {
     fs.ensureDir(options.dirInvalid),
   ])
 
+  let validCount = 0
+  let invalidCount = 0
+
+  const preprocess = options.tolerance === 'high'
+    ? createPreprocessCombinations(
+      [4, 3, 1.5],
+      [0.9, 1.1, 1.2, 1.4],
+      [0.5, 1, 2],
+    )
+    : options.tolerance === 'medium'
+      ? createPreprocessCombinations(
+        [1.5],
+        [0.9, 1.1],
+        [0.5, 1],
+      )
+      : []
+
   await Promise.all(
     files.map(file => limit(async () => {
       const result = await verifyScan(file, {
         resize: 300,
         preprocess: [
           {},
-          ...[4, 3, 1.5].flatMap(contrast =>
-            [1, 0.5, 2].flatMap(blur =>
-              [0.9, 1.1, 1.2, 1.4].map((brightness) => {
-                return {
-                  contrast,
-                  blur,
-                  brightness,
-                }
-              }),
-            ),
-          ).sort(() => Math.random() - 0.5),
-        ],
+          ...preprocess,
+        ].sort(() => Math.random() - 0.5),
       })
 
       const path = relative(options.dirSource, file)
 
-      if (result)
-        console.log(`${c.green.bold.inverse(' SCAN ')} ${c.gray(`${path} - `)} ${c.green.bold(result)}`)
-      else
-        console.log(`${c.yellow.bold.inverse(' FAIL ')} ${c.gray(path)}`)
+      if (result) {
+        validCount += 1
+        console.log(`${c.green.bold.inverse(' SCAN ')} ${c.gray(`${path} - `)}${c.green.bold(result)}`)
+      }
+      else {
+        invalidCount += 1
+        console.log(`${c.red.bold.inverse(' FAIL ')} ${c.gray(path)}`)
+      }
 
-      const targetDir = result ? options.dirValid : options.dirInvalid
-      if (options.mode === 'move')
-        await fs.move(file, join(targetDir, basename(file)))
-      else
-        await fs.copy(file, join(targetDir, basename(file)))
+      if (options.mode !== 'none') {
+        const targetDir = result ? options.dirValid : options.dirInvalid
+        if (options.mode === 'move')
+          await fs.move(file, join(targetDir, basename(file)))
+        else
+          await fs.copy(file, join(targetDir, basename(file)))
+      }
     })),
+  )
+
+  console.log(`\n${c.green.bold('Task finished.')}\n${c.green.bold(validCount)} scannable images, ${c.yellow.bold(invalidCount)} non-scannable images.`)
+  console.log(`\n${c.gray('Note that non-scannable images do no mean they are impossible to scan,\nbut at least it indicates they may be hard to scan.\nYou can utilize https://qrcode.antfu.me to investigate more.')}\n`)
+}
+
+function createPreprocessCombinations(
+  _contrast: number[],
+  _brightness: number[],
+  _blur: number[],
+): PreprocessOptions[] {
+  return _contrast.flatMap(contrast =>
+    _blur.flatMap(blur =>
+      _brightness.map((brightness) => {
+        return {
+          contrast,
+          blur,
+          brightness,
+        }
+      }),
+    ),
   )
 }
 
