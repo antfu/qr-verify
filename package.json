@@ -1,7 +1,7 @@
 {
   "name": "qr-verify",
   "type": "module",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "packageManager": "pnpm@8.6.0",
   "description": "",
   "author": "Anthony Fu <anthonyfu117@hotmail.com>",
@@ -67,5 +67,4 @@
   "lint-staged": {
     "*": "eslint --fix"
   }
-
 }
