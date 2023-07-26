@@ -15,7 +15,7 @@ export interface CliOptions {
   dirSource: string
   dirValid: string
   dirInvalid: string
-  mode: 'move' | 'copy' | 'none'
+  mode: 'move' | 'copy' | 'none' | 'move-valid' | 'move-invalid'
   tolerance: 'none' | 'high' | 'medium'
 }
 
@@ -28,6 +28,13 @@ async function run() {
     tolerance: 'high',
   }
 
+  const relativePath = (p: string) => {
+    const a = relative(options.dirSource, p)
+    if (a.startsWith('..'))
+      return p
+    return `./${a}`
+  }
+
   const files = await fg('*.{png,jpg,jpeg,webp}', {
     cwd: options.dirSource,
     onlyFiles: true,
@@ -35,12 +42,15 @@ async function run() {
     absolute: true,
   })
 
+  console.log(`\n${c.green.bold.inverse(' QR Code Verifier ') + c.gray(` v${version}`)}\n`)
+
   if (!files.length) {
-    console.log(c.yellow('\nNo images found in this directory'))
+    console.log(c.yellow('No images found in this directory\n'))
     process.exit(0)
   }
-
-  console.log(c.blue(`\n· ${files.length} images founded\n`))
+  else {
+    console.log(`${c.blue.bold(files.length)} images founded\n`)
+  }
 
   Object.assign(options, await prompts([
     {
@@ -53,12 +63,20 @@ async function run() {
           title: 'Move images',
         },
         {
-          value: 'move',
+          value: 'copy',
           title: 'Copy images',
         },
         {
           value: 'none',
           title: 'Scan only',
+        },
+        {
+          value: 'move-valid',
+          title: 'Move scannable images only',
+        },
+        {
+          value: 'move-invalid',
+          title: 'Move non-scannable images only',
         },
       ],
     },
@@ -83,18 +101,45 @@ async function run() {
     },
   ]))
 
-  console.log()
-  console.log(boxen([
-    c.green.bold('QR Code Verifier') + c.gray(` v${version}`),
-    '',
-    'Verify images in the current directory to see if they are scannable QR Code',
+  const lines = [
+    'Verify scannable QR Code in the current directory:',
     c.blue(`${options.dirSource}`),
     '',
-  `If it's scannable, ${c.yellow.bold(options.mode)} to:`,
-  c.blue(`${options.dirValid}`),
-  `If not, ${c.yellow.bold(options.mode)} to:`,
-  c.blue(`${options.dirInvalid}`),
-  ].join('\n'), { padding: 1, borderColor: 'green', borderStyle: 'round' }))
+  ]
+
+  if (options.mode === 'none') {
+    lines.push(
+      'Prints the scan result only.',
+    )
+  }
+  else if (options.mode === 'move-invalid') {
+    lines.push(
+      'If it\'s scannable, print the result only.',
+      `If not, ${c.yellow.bold('move')} to:`,
+      c.blue(`${relativePath(options.dirInvalid)}`),
+    )
+  }
+  else if (options.mode === 'move-valid') {
+    lines.push(
+      `If it's scannable, ${c.yellow.bold('move')} to:`,
+      c.blue(`${relativePath(options.dirValid)}`),
+      'If not, print the result only.',
+    )
+  }
+  else {
+    const mode = options.mode === 'copy'
+      ? c.green.bold(options.mode)
+      : c.yellow.bold(options.mode)
+    lines.push(
+      `If it's scannable, ${mode} to:`,
+      c.blue(`${relativePath(options.dirValid)}`),
+      `If not, ${mode} to:`,
+      c.blue(`${relativePath(options.dirInvalid)}`),
+    )
+  }
+
+  console.log()
+  console.log(boxen(lines.join('\n'), { padding: 1, borderColor: 'green', borderStyle: 'round' }))
   console.log()
 
   const { confirm } = await prompts([
@@ -158,10 +203,14 @@ async function run() {
 
       if (options.mode !== 'none') {
         const targetDir = result ? options.dirValid : options.dirInvalid
-        if (options.mode === 'move')
-          await fs.move(file, join(targetDir, basename(file)))
-        else
+        if (options.mode === 'copy')
           await fs.copy(file, join(targetDir, basename(file)))
+        else if (options.mode === 'move')
+          await fs.move(file, join(targetDir, basename(file)))
+        else if (options.mode === 'move-valid' && result)
+          await fs.move(file, join(targetDir, basename(file)))
+        else if (options.mode === 'move-invalid' && !result)
+          await fs.move(file, join(targetDir, basename(file)))
       }
     })),
   )
