@@ -11,12 +11,31 @@ import { version } from '../package.json'
 import type { PreprocessOptions } from './scan'
 import { verifyScan } from './scan'
 
+enum Mode {
+  Move = 'move',
+  Copy = 'copy',
+  None = 'none',
+  MoveValid = 'move-valid',
+  MoveInvalid = 'move-invalid',
+}
+
+enum Tolerance {
+  None = 'none',
+  High = 'high',
+  Medium = 'medium',
+}
+
 export interface CliOptions {
   dirSource: string
   dirValid: string
   dirInvalid: string
-  mode: 'move' | 'copy' | 'none' | 'move-valid' | 'move-invalid'
-  tolerance: 'none' | 'high' | 'medium'
+  mode: Mode
+  tolerance: Tolerance
+}
+
+interface PromptChoice {
+  value: Mode | Tolerance
+  title: string
 }
 
 async function run() {
@@ -24,8 +43,8 @@ async function run() {
     dirSource: process.cwd(),
     dirValid: join(process.cwd(), 'scannable'),
     dirInvalid: join(process.cwd(), 'non-scannable'),
-    mode: 'move',
-    tolerance: 'high',
+    mode: Mode.Move,
+    tolerance: Tolerance.High,
   }
 
   const relativePath = (p: string) => {
@@ -52,55 +71,61 @@ async function run() {
     console.log(`${c.blue.bold(files.length)} images founded\n`)
   }
 
-  Object.assign(options, await prompts([
+  const modeChoices: PromptChoice[] = [
     {
-      type: 'select',
-      name: 'mode',
-      message: 'Select the mode of file operation',
-      choices: [
-        {
-          value: 'move',
-          title: 'Move images',
-        },
-        {
-          value: 'copy',
-          title: 'Copy images',
-        },
-        {
-          value: 'none',
-          title: 'Scan only',
-        },
-        {
-          value: 'move-valid',
-          title: 'Move scannable images only',
-        },
-        {
-          value: 'move-invalid',
-          title: 'Move non-scannable images only',
-        },
-      ],
+      value: Mode.Move,
+      title: 'Move images',
     },
     {
-      type: 'select',
-      name: 'tolerance',
-      message: 'Select scanner tolerance (chance to get scanned)',
-      choices: [
-        {
-          value: 'high',
-          title: 'High tolerance (try 25 times)',
-        },
-        {
-          value: 'medium',
-          title: 'Medium tolerance (try 9 times)',
-        },
-        {
-          value: 'none',
-          title: 'No preprocessing',
-        },
-      ],
+      value: Mode.Copy,
+      title: 'Copy images',
     },
-  ]))
+    {
+      value: Mode.None,
+      title: 'Scan only',
+    },
+    {
+      value: Mode.MoveValid,
+      title: 'Move scannable images only',
+    },
+    {
+      value: Mode.MoveInvalid,
+      title: 'Move non-scannable images only',
+    },
+  ]
 
+  const toleranceChoices: PromptChoice[] = [
+    {
+      value: Tolerance.High,
+      title: 'High tolerance (try 25 times)',
+    },
+    {
+      value: Tolerance.Medium,
+      title: 'Medium tolerance (try 9 times)',
+    },
+    {
+      value: Tolerance.None,
+      title: 'No preprocessing',
+    },
+  ]
+
+  Object.assign(
+    options,
+    await prompts([
+      {
+        type: 'select',
+        name: 'mode',
+        message: 'Select the mode of file operation',
+        choices: modeChoices,
+      },
+      {
+        type: 'select',
+        name: 'tolerance',
+        message: 'Select scanner tolerance (chance to get scanned)',
+        choices: toleranceChoices,
+      },
+    ]),
+  )
   const lines = [
     'Verify scannable QR Code in the current directory:',
     c.blue(`${options.dirSource}`),
