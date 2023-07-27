@@ -87,7 +87,7 @@ async function run() {
       choices: [
         {
           value: 'high',
-          title: 'High tolerance (try 49 times)',
+          title: 'High tolerance (try 37 times)',
         },
         {
           value: 'medium',
@@ -168,8 +168,8 @@ async function run() {
 
   const preprocess = options.tolerance === 'high'
     ? createPreprocessCombinations(
-      [4, 3, 1.5],
-      [0.9, 1.1, 1.2, 1.4],
+      [6, 3, 1.5],
+      [0.9, 1.2, 1.4],
       [0.5, 1, 1.5, 2],
     )
     : options.tolerance === 'medium'
