@@ -158,10 +158,10 @@ async function run() {
 
   const limit = pLimit(5)
 
-  await Promise.all([
-    fs.ensureDir(options.dirValid),
-    fs.ensureDir(options.dirInvalid),
-  ])
+  if (options.mode !== 'none' && options.mode !== 'move-invalid')
+    fs.ensureDir(options.dirValid)
+  if (options.mode !== 'none' && options.mode !== 'move-valid')
+    fs.ensureDir(options.dirInvalid)
 
   let validCount = 0
   let invalidCount = 0
