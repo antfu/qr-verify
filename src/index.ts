@@ -87,7 +87,7 @@ async function run() {
       choices: [
         {
           value: 'high',
-          title: 'High tolerance (try 25 times)',
+          title: 'High tolerance (try 49 times)',
         },
         {
           value: 'medium',
@@ -156,7 +156,7 @@ async function run() {
 
   console.log()
 
-  const limit = pLimit(5)
+  const limit = pLimit(8)
 
   if (options.mode !== 'none' && options.mode !== 'move-invalid')
     fs.ensureDir(options.dirValid)
@@ -170,7 +170,7 @@ async function run() {
     ? createPreprocessCombinations(
       [4, 3, 1.5],
       [0.9, 1.1, 1.2, 1.4],
-      [0.5, 1, 2],
+      [0.5, 1, 1.5, 2],
     )
     : options.tolerance === 'medium'
       ? createPreprocessCombinations(
