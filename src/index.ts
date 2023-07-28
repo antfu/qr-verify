@@ -20,6 +20,9 @@ export interface CliOptions {
 }
 
 async function run() {
+  const args = process.argv.slice(2)
+  const yes = args.includes('-y') || args.includes('--yes')
+
   const options: CliOptions = {
     dirSource: process.cwd(),
     dirValid: join(process.cwd(), 'scannable'),
@@ -52,54 +55,56 @@ async function run() {
     console.log(`${c.blue.bold(files.length)} images founded\n`)
   }
 
-  Object.assign(options, await prompts([
-    {
-      type: 'select',
-      name: 'mode',
-      message: 'Select the mode of file operation',
-      choices: [
-        {
-          value: 'move',
-          title: 'Move images',
-        },
-        {
-          value: 'copy',
-          title: 'Copy images',
-        },
-        {
-          value: 'none',
-          title: 'Scan only',
-        },
-        {
-          value: 'move-valid',
-          title: 'Move scannable images only',
-        },
-        {
-          value: 'move-invalid',
-          title: 'Move non-scannable images only',
-        },
-      ],
-    },
-    {
-      type: 'select',
-      name: 'tolerance',
-      message: 'Select scanner tolerance (chance to get scanned)',
-      choices: [
-        {
-          value: 'high',
-          title: 'High tolerance (try 37 times)',
-        },
-        {
-          value: 'medium',
-          title: 'Medium tolerance (try 9 times)',
-        },
-        {
-          value: 'none',
-          title: 'No preprocessing',
-        },
-      ],
-    },
-  ]))
+  if (!yes) {
+    Object.assign(options, await prompts([
+      {
+        type: 'select',
+        name: 'mode',
+        message: 'Select the mode of file operation',
+        choices: [
+          {
+            value: 'move',
+            title: 'Move images',
+          },
+          {
+            value: 'copy',
+            title: 'Copy images',
+          },
+          {
+            value: 'none',
+            title: 'Scan only',
+          },
+          {
+            value: 'move-valid',
+            title: 'Move scannable images only',
+          },
+          {
+            value: 'move-invalid',
+            title: 'Move non-scannable images only',
+          },
+        ],
+      },
+      {
+        type: 'select',
+        name: 'tolerance',
+        message: 'Select scanner tolerance (chance to get scanned)',
+        choices: [
+          {
+            value: 'high',
+            title: 'High tolerance (try 37 times)',
+          },
+          {
+            value: 'medium',
+            title: 'Medium tolerance (try 9 times)',
+          },
+          {
+            value: 'none',
+            title: 'No preprocessing',
+          },
+        ],
+      },
+    ]))
+  }
 
   const lines = [
     'Verify scannable QR Code in the current directory:',
@@ -142,19 +147,20 @@ async function run() {
   console.log(boxen(lines.join('\n'), { padding: 1, borderColor: 'green', borderStyle: 'round' }))
   console.log()
 
-  const { confirm } = await prompts([
-    {
-      name: 'confirm',
-      type: 'confirm',
-      initial: true,
-      message: 'Start?',
-    },
-  ])
+  if (!yes) {
+    const { confirm } = await prompts([
+      {
+        name: 'confirm',
+        type: 'confirm',
+        initial: true,
+        message: 'Start?',
+      },
+    ])
 
-  if (!confirm)
-    process.exit(1)
-
-  console.log()
+    if (!confirm)
+      process.exit(1)
+    console.log()
+  }
 
   const limit = pLimit(8)
 
