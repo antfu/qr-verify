@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import process from 'node:process'
 import { Command, Option } from '@commander-js/extra-typings'
 import type { PromptObject } from 'prompts'
 import prompts from 'prompts'
